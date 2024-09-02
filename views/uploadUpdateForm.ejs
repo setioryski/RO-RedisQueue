@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Update untuk baris  <%= asset.id %></title>
+    <link rel="stylesheet" href="/stylesuploadupdate.css">
+</head>
+<body>
+    <h1>Update untuk baris  <%= asset.id %></h1>
+    
+    <!-- Link back to dashboard -->
+    <a id="dashboardLink" href="/dashboard">Back to Dashboard</a>
+
+    <form id="updateForm" action="/uploadupdate/<%= asset.id %>" method="post" enctype="multipart/form-data">
+        
+        <div>
+            <label for="id_kondisi">Condition:</label>
+            <select id="id_kondisi" name="id_kondisi" required>
+                <% conditions.forEach(function(condition) { %>
+                    <option value="<%= condition.id %>" <%= asset.id_kondisi === condition.id ? 'selected' : '' %>>
+                        <%= condition.nama_kondisi %>
+                    </option>
+                <% }); %>
+            </select>
+        </div>   
+        <div>
+            <label for="status">Status:</label>
+            <select id="status" name="status" required>
+                <option value="Done" <%= asset.status === 'Done' ? 'selected' : '' %>>Done</option>
+                <option value="On Progress" <%= asset.status === 'On Progress' ? 'selected' : '' %>>On Progress</option>
+                <option value="Custom" <%= asset.status !== 'Done' && asset.status !== 'On Progress' ? 'selected' : '' %>>Custom</option>
+            </select>
+        </div>   
+        <div id="customStatusDiv" style="display: none;">
+            <label for="customStatus">Enter WO Code:</label>
+            <input type="text" id="customStatus" name="customStatus" value="<%= asset.status !== 'Done' && asset.status !== 'On Progress' ? asset.status : '' %>">
+        </div>  
+        
+        <div>
+            <label for="keterangan">Keterangan:</label>
+            <textarea id="keterangan" name="keterangan"><%= asset.keterangan %></textarea>
+        </div>
+        
+        <div>
+            <label for="completion_date">Completion Date:</label>
+            <input type="date" id="completion_date" name="completion_date" value="<%= asset.completion_date ? asset.completion_date.toISOString().substring(0, 10) : '' %>">
+        </div>
+        
+        <div>
+            <label for="completed_photo">Completed Photo:</label>
+            <input type="file" id="completed_photo" name="completed_photo">
+            <% if (asset.completed_photo) { %>
+                <img src="/<%= asset.completed_photo %>" alt="Completed Photo" style="width:200px;">
+            <% } %>
+        </div>
+        
+        <button type="submit">Submit Update</button>
+    </form>
+    
+    <div id="successMessage" style="display: none;">Update successful!</div>
+    <div id="errorMessage" style="display: none;">Update failed. Please try again.</div>
+
+    <script>
+        function handleCustomStatus() {
+            const statusSelect = document.getElementById('status');
+            const customStatusDiv = document.getElementById('customStatusDiv');
+            if (statusSelect.value === 'Custom') {
+                customStatusDiv.style.display = 'block';
+                document.getElementById('customStatus').required = true;
+            } else {
+                customStatusDiv.style.display = 'none';
+                document.getElementById('customStatus').required = false;
+            }
+        }
+
+        document.getElementById('status').addEventListener('change', handleCustomStatus);
+        document.getElementById('updateForm').addEventListener('submit', function(event) {
+            event.preventDefault(); // Prevent default form submission
+
+            const formData = new FormData(this);
+
+            // If custom status is visible, use its value
+            if (document.getElementById('customStatusDiv').style.display === 'block') {
+                formData.set('status', document.getElementById('customStatus').value);
+            }
+
+            fetch(this.action, {
+                method: 'POST',
+                body: formData,
+            })
+            .then(response => {
+                if (response.ok) {
+                    document.getElementById('successMessage').style.display = 'block';
+                    document.getElementById('errorMessage').style.display = 'none';
+                    // Optionally, clear the form or reset specific fields
+                } else {
+                    throw new Error('Network response was not ok');
+                }
+            })
+            .catch(error => {
+                document.getElementById('successMessage').style.display = 'none';
+                document.getElementById('errorMessage').style.display = 'block';
+            });
+        });
+
+        // Initialize custom status field display based on the current value
+        handleCustomStatus();
+    </script>
+</body>
+</html>

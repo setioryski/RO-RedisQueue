@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Formulir Defect Daily</title>
+    <link rel="stylesheet" href="stylesinspection.css">
+</head>
+<body>
+    <nav>
+        <ul>
+            <li><a href="/dashboard">Dashboard</a></li>
+            <li><a href="/admin">Admin</a></li>
+            <li><a href="/logout">Logout</a></li>
+        </ul>
+    </nav>
+
+    <h1>FORM DAILY DEFECT RO</h1>
+
+    <form action="/upload" method="post" enctype="multipart/form-data" id="inspectionForm">
+        <div>
+            <label for="foto">Foto:</label>
+            <input type="file" id="foto" name="foto" required onchange="previewFile()">
+            <img id="previewImg" src="" alt="Image preview" height="200" style="display: none;"><br>
+        </div>
+
+        <div>
+            <label for="id_user">Nama:</label>
+            <select id="id_user" name="id_user" required>
+                <option value="<%= user.id %>"><%= user.name %></option>
+            </select>
+        </div>
+    
+        <div>
+            <label for="id_tipe_lantai">Lantai:</label>
+            <select id="id_tipe_lantai" name="id_tipe_lantai">
+                <option value="">Pilih Lantai</option>
+                <% tipe_lantai.forEach(tl => { %>
+                    <option value="<%= tl.id %>"><%= tl.nama_lantai %></option>
+                <% }); %>
+            </select>
+        </div>
+    
+        <div>
+            <label for="id_kondisi">Work Progress Detail:</label>
+            <select id="id_kondisi" name="id_kondisi">
+                <option value="">Pilih Kondisi</option>
+                <% tipe_kondisi.forEach(tk => { %>
+                    <option value="<%= tk.id %>"><%= tk.nama_kondisi %></option>
+                <% }); %>
+            </select>
+        </div>
+    
+        <div>
+            <label for="catatan">Issue Defect:</label>
+            <textarea id="catatan" name="catatan"></textarea>
+        </div>
+    
+        <div>
+            <label for="target_completion_date">Target Completion Date:</label>
+            <input type="date" id="target_completion_date" name="target_completion_date" required>
+        </div>
+    
+        <div>
+            <label for="id_department">PIC:</label>
+            <select id="id_department" name="id_department">
+                <option value="">Pilih Department</option>
+                <% tipe_department.forEach(department => { %>
+                    <option value="<%= department.id %>"><%= department.nama_department %></option>
+                <% }); %>
+            </select>
+        </div>
+    
+        <button type="submit" id="submitButton">Kirim</button>
+    </form>
+    
+    <div id="loadingMessage" style="display: none; color: #007BFF;">Submitting form...</div>
+    <div id="successMessage" style="display: none; color: green;">Form submitted successfully!</div>
+    <div id="errorMessage" style="display: none; color: red;">There was an error submitting the form.</div>
+
+    <script>
+        function previewFile() {
+            const preview = document.getElementById('previewImg');
+            const file = document.getElementById('foto').files[0];
+            const reader = new FileReader();
+
+            reader.onloadend = function () {
+                preview.src = reader.result;
+                preview.style.display = 'block';
+            }
+
+            if (file) {
+                reader.readAsDataURL(file);
+            } else {
+                preview.src = "";
+                preview.style.display = 'none';
+            }
+        }
+
+        async function submitFormData(formData) {
+            showLoadingMessage();
+
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+
+                hideLoadingMessage();
+
+                if (data.success) {
+                    showSuccessMessage('Form submitted successfully!');
+                } else {
+                    throw new Error(data.message);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                hideLoadingMessage();
+                showErrorMessage(error.message);
+            }
+        }
+
+        function showLoadingMessage() {
+            const loadingMessage = document.getElementById('loadingMessage');
+            loadingMessage.style.display = 'block';
+        }
+
+        function hideLoadingMessage() {
+            const loadingMessage = document.getElementById('loadingMessage');
+            loadingMessage.style.display = 'none';
+        }
+
+        function showSuccessMessage(message) {
+            const successMessage = document.getElementById('successMessage');
+            successMessage.textContent = message;
+            successMessage.style.display = 'block';
+            setTimeout(() => {
+                successMessage.style.display = 'none';
+            }, 5000);
+        }
+
+        function showErrorMessage(message) {
+            const errorMessage = document.getElementById('errorMessage');
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'block';
+            setTimeout(() => {
+                errorMessage.style.display = 'none';
+            }, 5000);
+        }
+
+        document.getElementById('inspectionForm').addEventListener('submit', function(e) {
+            e.preventDefault(); // Prevent default form submission
+
+            const formData = new FormData(this);
+
+            // Immediately reset the form fields and allow the user to continue using the form
+            this.reset();
+            document.getElementById('previewImg').src = '';
+            document.getElementById('previewImg').style.display = 'none';
+
+            // Reset the date to today after form reset
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('target_completion_date').value = today;
+
+            // Submit the form data in the background
+            submitFormData(formData);
+        });
+
+        // Set default date to today
+        document.addEventListener('DOMContentLoaded', function() {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('target_completion_date').value = today;
+        });
+    </script>
+</body>
+</html>

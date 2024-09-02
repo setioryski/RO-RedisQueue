@@ -1,0 +1,74 @@
+const express = require('express');
+const multer = require('multer');
+const sharp = require('sharp');
+const bcrypt = require('bcrypt');
+const session = require('express-session');
+const path = require('path');
+const util = require('util');
+const rateLimit = require('express-rate-limit');
+const dashboardRoutes = require('./routes/dashboard');
+const pool = require('./config/db');
+const { isAuthenticated, checkRole } = require('./authMiddleware');
+
+const app = express();
+
+// Your existing middleware and routes setup
+
+// HTTPS server setup
+const setupHttpsServer = require('./https-server');
+setupHttpsServer(app, 443, 3000); // Listen on port 443 for HTTPS and port 3000 for HTTP redirection
+
+// Session configuration
+app.use(session({
+    secret: 'your_secret_key',
+    resave: false,
+    saveUninitialized: false,
+    cookie: { secure: true, httpOnly: true, maxAge: 4000000 } // Set secure to true for HTTPS
+}));
+
+// Your existing routes and middleware continue here
+
+module.exports = app;
+
+
+
+
+
+
+
+
+//Open your Nginx configuration file for your domain:
+
+//bash
+sudo nano /etc/nginx/sites-available/dpsec.my.id
+//Update the Nginx configuration to proxy requests to your Node.js application:
+
+
+server {
+    listen 80;
+    server_name dpsec.my.id www.dpsec.my.id;
+
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name dpsec.my.id www.dpsec.my.id;
+
+    ssl_certificate /etc/letsencrypt/live/dpsec.my.id/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/dpsec.my.id/privkey.pem;
+
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+//Save the file and exit.
+//Restart Nginx to apply the changes:
+
+//bash
+sudo systemctl restart nginx

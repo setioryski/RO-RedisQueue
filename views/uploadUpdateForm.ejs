@@ -3,15 +3,60 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Update untuk baris  <%= asset.id %></title>
+    <title>Update untuk baris <%= asset.id %></title>
     <link rel="stylesheet" href="/stylesuploadupdate.css">
+    <style>
+        /* Spinner for loading state */
+        #loadingMessage {
+            display: none; /* Initially hidden */
+            align-items: center;
+        }
+
+        #loadingSpinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-left-color: #007BFF;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            margin-right: 8px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Notification styling */
+        .notification {
+            display: none;
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
 </head>
 <body>
-    <h1>Update untuk baris  <%= asset.id %></h1>
-    
-    <!-- Link back to dashboard -->
-    <a id="dashboardLink" href="/dashboard">Back to Dashboard</a>
+    <!-- Header Section -->
+    <header>
+        <h1>Update untuk baris <%= asset.id %></h1>
+        <!-- Link back to dashboard -->
+        <a id="dashboardLink" href="/dashboard">Back to Dashboard</a>
+    </header>
 
+    <!-- Form Section -->
     <form id="updateForm" action="/uploadupdate/<%= asset.id %>" method="post" enctype="multipart/form-data">
         
         <div>
@@ -26,7 +71,7 @@
         </div>   
         <div>
             <label for="status">Status:</label>
-            <select id="status" name="status" required>
+            <select id="status" name="status">
                 <option value="Done" <%= asset.status === 'Done' ? 'selected' : '' %>>Done</option>
                 <option value="On Progress" <%= asset.status === 'On Progress' ? 'selected' : '' %>>On Progress</option>
                 <option value="Custom" <%= asset.status !== 'Done' && asset.status !== 'On Progress' ? 'selected' : '' %>>Custom</option>
@@ -49,22 +94,28 @@
         
         <div>
             <label for="completed_photo">Completed Photo:</label>
-            <input type="file" id="completed_photo" name="completed_photo">
+            <input type="file" id="completed_photo" name="completed_photo" accept="image/*" onchange="previewCompletedPhoto()">
+            <img id="completedPhotoPreview" src="" alt="Completed Photo Preview" style="display: none; width:200px;">
             <% if (asset.completed_photo) { %>
                 <img src="/<%= asset.completed_photo %>" alt="Completed Photo" style="width:200px;">
             <% } %>
         </div>
         
-        <button type="submit">Submit Update</button>
+        <button type="submit" id="submitButton">Submit Update</button>
     </form>
     
-    <div id="successMessage" style="display: none;">Update successful!</div>
-    <div id="errorMessage" style="display: none;">Update failed. Please try again.</div>
+    <div id="loadingMessage">
+        <div id="loadingSpinner"></div>
+        <span>Submitting form, please wait...</span>
+    </div>
+    <div id="successMessage" class="notification success">Update successful!</div>
+    <div id="errorMessage" class="notification error">Update failed. Please try again.</div>
 
     <script>
         function handleCustomStatus() {
             const statusSelect = document.getElementById('status');
             const customStatusDiv = document.getElementById('customStatusDiv');
+            
             if (statusSelect.value === 'Custom') {
                 customStatusDiv.style.display = 'block';
                 document.getElementById('customStatus').required = true;
@@ -74,16 +125,67 @@
             }
         }
 
+        function previewCompletedPhoto() {
+            const preview = document.getElementById('completedPhotoPreview');
+            const file = document.getElementById('completed_photo').files[0];
+            const reader = new FileReader();
+
+            reader.onloadend = function () {
+                preview.src = reader.result;
+                preview.style.display = 'block';
+            }
+
+            if (file) {
+                reader.readAsDataURL(file);
+            } else {
+                preview.src = "";
+                preview.style.display = 'none';
+            }
+        }
+
+        function showLoadingMessage() {
+            document.getElementById('loadingMessage').style.display = 'flex';
+        }
+
+        function hideLoadingMessage() {
+            document.getElementById('loadingMessage').style.display = 'none';
+        }
+
+        function showSuccessMessage(message) {
+            const successMessage = document.getElementById('successMessage');
+            successMessage.textContent = message;
+            successMessage.style.display = 'block';
+            setTimeout(() => {
+                successMessage.style.display = 'none';
+            }, 5000);
+        }
+
+        function showErrorMessage(message) {
+            const errorMessage = document.getElementById('errorMessage');
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'block';
+            setTimeout(() => {
+                errorMessage.style.display = 'none';
+            }, 5000);
+        }
+
         document.getElementById('status').addEventListener('change', handleCustomStatus);
+
         document.getElementById('updateForm').addEventListener('submit', function(event) {
             event.preventDefault(); // Prevent default form submission
 
             const formData = new FormData(this);
+            const submitButton = document.getElementById('submitButton');
+
+            // Disable the submit button to prevent multiple submissions
+            submitButton.disabled = true;
 
             // If custom status is visible, use its value
             if (document.getElementById('customStatusDiv').style.display === 'block') {
                 formData.set('status', document.getElementById('customStatus').value);
             }
+
+            showLoadingMessage();
 
             fetch(this.action, {
                 method: 'POST',
@@ -91,16 +193,19 @@
             })
             .then(response => {
                 if (response.ok) {
-                    document.getElementById('successMessage').style.display = 'block';
-                    document.getElementById('errorMessage').style.display = 'none';
-                    // Optionally, clear the form or reset specific fields
+                    showSuccessMessage('Update successful!');
+                    hideLoadingMessage();
+                    submitButton.disabled = false; // Re-enable the button after submission
+                    document.getElementById('updateForm').reset(); // Optionally reset the form
+                    document.getElementById('completedPhotoPreview').style.display = 'none'; // Hide the preview image
                 } else {
                     throw new Error('Network response was not ok');
                 }
             })
             .catch(error => {
-                document.getElementById('successMessage').style.display = 'none';
-                document.getElementById('errorMessage').style.display = 'block';
+                showErrorMessage('Update failed. Please try again.');
+                hideLoadingMessage();
+                submitButton.disabled = false; // Re-enable the button in case of an error
             });
         });
 

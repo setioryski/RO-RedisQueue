@@ -195,7 +195,6 @@ app.post('/upload', isAuthenticated, checkRole(['admin', 'petugas']), upload.sin
 
 
 //uploadupdate
-
 app.get('/uploadupdate/:id', isAuthenticated, checkRole(['admin', 'petugas']), (req, res) => {
     const assetId = req.params.id;
 
@@ -258,25 +257,37 @@ app.post('/uploadupdate/:id', isAuthenticated, checkRole(['admin', 'petugas']), 
         if (req.file) {
             const oldPhotoDirectory = path.resolve(__dirname, 'uploadscomplete');
             const oldPhotoPrefix = `completed-${assetId}`;
-            const files = fs.readdirSync(oldPhotoDirectory);
 
-            files.forEach(file => {
-                if (file.startsWith(oldPhotoPrefix)) {
-                    const oldFilePath = path.join(oldPhotoDirectory, file);
-                    console.log(`Attempting to delete old file: ${oldFilePath}`);
-                    deleteFileWithRetry(oldFilePath);
+            try {
+                const files = await fs.readdir(oldPhotoDirectory);
+
+                for (const file of files) {
+                    if (file.startsWith(oldPhotoPrefix)) {
+                        const oldFilePath = path.join(oldPhotoDirectory, file);
+                        console.log(`Attempting to delete old file: ${oldFilePath}`);
+                        await deleteFileWithRetry(oldFilePath);
+                    }
                 }
-            });
+            } catch (err) {
+                console.error('Failed to read the directory:', err);
+                return res.status(500).json({ success: false, message: 'Error processing files.' });
+            }
 
             completedImagePath = path.join('uploadscomplete', `completed-${assetId}-${req.file.filename}`);
             const fullCompletedImagePath = path.resolve(__dirname, completedImagePath);
-            await sharp(req.file.path)
-                .rotate()
-                .resize(800)
-                .jpeg({ quality: 70 })
-                .toFile(fullCompletedImagePath);
 
-            deleteFileWithRetry(req.file.path);
+            try {
+                await sharp(req.file.path)
+                    .rotate()
+                    .resize(800)
+                    .jpeg({ quality: 70 })
+                    .toFile(fullCompletedImagePath);
+
+                await deleteFileWithRetry(req.file.path); // Delete original file after resizing
+            } catch (err) {
+                console.error('Error processing image:', err);
+                return res.status(500).json({ success: false, message: 'Error processing image.' });
+            }
         } else {
             completedImagePath = currentAsset.completed_photo; // Retain old photo if no new one is uploaded
         }
@@ -293,29 +304,35 @@ app.post('/uploadupdate/:id', isAuthenticated, checkRole(['admin', 'petugas']), 
             status, 
             keterangan, 
             completionDateValue, 
-            id_kondisi,  // Update the id_kondisi value
+            id_kondisi,
             assetId
         ];
 
-        pool.query(queryUpdate, queryValues, (err, result) => {
-            if (err) {
-                console.error('Failed to update the database:', err);
-        
-                if (completedImagePath && completedImagePath !== currentAsset.completed_photo) {
-                    deleteFileWithRetry(path.resolve(__dirname, completedImagePath)); // Cleanup resized file on failure
-                }
-                return res.status(500).json({ success: false, message: 'Database update failed.' });
-            }
+        await pool.query(queryUpdate, queryValues);
 
-            res.status(200).json({ success: true, message: 'Update submitted successfully!' });
-        });
+        res.status(200).json({ success: true, message: 'Update submitted successfully!' });
 
     } catch (error) {
         console.error('Error during processing:', error);
-        if (req.file) deleteFileWithRetry(req.file.path); // Cleanup original file even on failure
+        if (req.file) await deleteFileWithRetry(req.file.path); // Cleanup original file on failure
         return res.status(500).json({ success: false, message: error.message });
     }
 });
+
+async function deleteFileWithRetry(filePath, retryCount = 3) {
+    for (let i = 0; i < retryCount; i++) {
+        try {
+            await fs.unlink(filePath);
+            console.log(`Deleted file: ${filePath}`);
+            break;
+        } catch (err) {
+            console.error(`Failed to delete file on attempt ${i + 1}:`, err);
+            if (i === retryCount - 1) {
+                console.error(`All attempts to delete file failed: ${filePath}`);
+            }
+        }
+    }
+}
 
 
 
